@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Time to move</title>
+<link rel="stylesheet" href="styles.css" />
+<style>
+  html,body{height:100%;overflow:hidden}
+  .overlay{
+    position:fixed;inset:0;display:grid;place-items:center;text-align:center;padding:20px;
+    background:radial-gradient(120% 120% at 50% 30%, #1c3a34, #0f1a18 70%);
+    color:#eafff6;
+  }
+  :root[data-theme="light"] .overlay{background:radial-gradient(120% 120% at 50% 30%, #d8f0e6, #eef6f2 70%);color:#123}
+  .ov-inner{max-width:520px;animation:rise .5s ease}
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  .ov-kicker{font-size:13px;letter-spacing:.22em;text-transform:uppercase;opacity:.7;margin-bottom:20px}
+  .ov-title{font-size:34px;font-weight:700;letter-spacing:-.02em;margin:0 0 14px}
+  .ov-msg{font-size:17px;opacity:.85;margin:0 auto 40px;max-width:400px}
+  .ring{position:relative;width:180px;height:180px;margin:0 auto 36px}
+  .ring svg{transform:rotate(-90deg)}
+  .ring .time{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);font-size:40px;font-weight:600;letter-spacing:-.02em}
+  .ov-skip{background:transparent;border:1px solid rgba(255,255,255,.28);color:inherit;padding:11px 22px;border-radius:11px;font-size:14px;cursor:pointer}
+  .ov-skip:hover{border-color:rgba(255,255,255,.6)}
+  :root[data-theme="light"] .ov-skip{border-color:rgba(0,0,0,.2)}
+  .ov-foot{margin-top:34px;font-size:13px;opacity:.6}
+</style>
+</head>
+<body>
+  <div class="overlay">
+    <div class="ov-inner">
+      <div class="ov-kicker">Time to move</div>
+      <h1 class="ov-title" id="ov-title">Stand up &amp; stretch</h1>
+      <p class="ov-msg" id="ov-msg">Loading…</p>
+      <div class="ring">
+        <svg width="180" height="180" viewBox="0 0 180 180">
+          <circle cx="90" cy="90" r="80" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="10"/>
+          <circle id="ring-fg" cx="90" cy="90" r="80" fill="none" stroke="var(--success)" stroke-width="10" stroke-linecap="round" stroke-dasharray="502.65" stroke-dashoffset="0"/>
+        </svg>
+        <div class="time" id="ov-time">--:--</div>
+      </div>
+      <button class="ov-skip" id="ov-skip">Skip break →</button>
+      <div class="ov-foot" id="ov-foot"></div>
+    </div>
+  </div>
+  <script src="overlay.js"></script>
+</body>
+</html>

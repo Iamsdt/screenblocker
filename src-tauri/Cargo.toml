@@ -1,0 +1,31 @@
+[package]
+name = "screenblocker"
+version = "0.1.0"
+description = "Stand-up & stretch break enforcer for KDE Plasma / Wayland"
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "screenblocker_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-notification = "2"
+tauri-plugin-autostart = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["clock"] }
+directories = "5"
+resvg = "0.42"
+usvg = "0.42"
+tiny-skia = "0.11"
+fastrand = "2"
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true

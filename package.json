@@ -1,0 +1,14 @@
+{
+  "name": "screenblocker",
+  "version": "0.1.0",
+  "description": "Stand-up & stretch break enforcer for KDE Plasma / Wayland",
+  "private": true,
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}
