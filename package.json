@@ -6,7 +6,7 @@
   "scripts": {
     "tauri": "tauri",
     "dev": "tauri dev",
-    "build": "tauri build"
+    "build": "APPIMAGE_EXTRACT_AND_RUN=1 NO_STRIP=true tauri build"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2"
