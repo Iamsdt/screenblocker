@@ -1,11 +1,29 @@
 # ScreenBlocker
 
+> 🧪 **A vibecode solution** — built end-to-end by pairing with an AI coding agent.
+> Ship-fast, self-hosted, and hackable by design.
+
 A personal *stand-up & stretch* enforcer for **KDE Plasma / Wayland**. It runs a
 repeating focus→break cycle, blocks your screen when a break is due (or nudges you
 gently during meetings), shows a live countdown right in your panel tray, and
 tracks your break history so you can watch yourself improve.
 
 Built with **Tauri v2** (Rust backend + WebView UI). Data lives in plain JSON.
+
+## Screenshots
+
+A live countdown rendered straight into your KDE panel tray:
+
+![Panel tray countdown](docs/screenshots/panel-timer.png)
+
+When a break is due, the screen is taken over by a fullscreen stretch prompt and
+countdown ring:
+
+![Fullscreen break overlay](docs/screenshots/break-screen.png)
+
+The dashboard tracks successful vs skipped breaks, your streak, and a 14-day trend:
+
+![Dashboard](docs/screenshots/dashboard.png)
 
 ## Features
 
