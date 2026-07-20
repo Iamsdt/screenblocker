@@ -41,6 +41,9 @@ pub fn random_stretch() -> (&'static str, &'static str) {
     STRETCH[fastrand::usize(..STRETCH.len())]
 }
 
+/// Retained for the meeting-notice message bank; not currently shown (breaks are
+/// silently counted as missed during a meeting rather than notified).
+#[allow(dead_code)]
 pub fn random_meeting() -> &'static str {
     MEETING[fastrand::usize(..MEETING.len())]
 }

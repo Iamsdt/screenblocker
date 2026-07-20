@@ -5,7 +5,7 @@
 use serde::Serialize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum Phase {
     Work,
     Break,
@@ -82,6 +82,7 @@ impl Engine {
                 self.remaining = self.work_secs;
                 Tick::BreakEnded
             }
+            // active_phase is only ever Work or Break.
             Phase::Paused => Tick::None,
         }
     }
@@ -92,19 +93,26 @@ impl Engine {
         self.remaining = self.break_secs;
     }
 
-    /// Skip the current break early — returns true if a break was actually
-    /// in progress (so the caller knows to log it as skipped).
-    pub fn skip_break(&mut self) -> bool {
-        if self.active_phase == Phase::Break {
-            self.active_phase = Phase::Work;
-            self.remaining = self.work_secs;
-            true
-        } else {
-            false
+    /// Skip the current break early. Returns `Some(percent)` — how far through
+    /// the break the user got (0–100) — if a break was in progress, else `None`.
+    /// The caller uses the percent to decide successful vs skipped.
+    pub fn skip_break_completion(&mut self) -> Option<u32> {
+        if self.active_phase != Phase::Break {
+            return None;
         }
+        let elapsed = (self.break_secs - self.remaining).max(0);
+        let percent = if self.break_secs > 0 {
+            ((elapsed * 100) / self.break_secs).clamp(0, 100) as u32
+        } else {
+            100
+        };
+        self.active_phase = Phase::Work;
+        self.remaining = self.work_secs;
+        Some(percent)
     }
 
-    /// Restart a fresh work interval (used after a meeting-mode notice).
+    /// Restart a fresh work interval (used when a break is skipped because a
+    /// meeting is in progress).
     pub fn restart_work(&mut self) {
         self.active_phase = Phase::Work;
         self.remaining = self.work_secs;
@@ -123,8 +131,13 @@ impl Engine {
     }
 
     pub fn state(&self) -> EngineState {
+        let phase = if self.paused {
+            Phase::Paused
+        } else {
+            self.active_phase
+        };
         EngineState {
-            phase: if self.paused { Phase::Paused } else { self.active_phase },
+            phase,
             remaining_secs: self.remaining,
             work_secs: self.work_secs,
             break_secs: self.break_secs,
@@ -160,11 +173,38 @@ mod tests {
     #[test]
     fn skip_only_counts_during_break() {
         let mut e = Engine::new(10, 5);
-        assert!(!e.skip_break(), "no break in progress");
+        assert_eq!(e.skip_break_completion(), None, "no break in progress");
         e.start_break();
-        assert!(e.skip_break(), "break was skipped");
+        assert!(e.skip_break_completion().is_some(), "break was skipped");
         assert_eq!(e.state().phase, Phase::Work);
         assert_eq!(e.state().remaining_secs, 10);
+    }
+
+    #[test]
+    fn skip_completion_reports_percent_elapsed() {
+        let mut e = Engine::new(10, 100);
+        e.start_break();
+        // Burn 80 of 100 break seconds.
+        for _ in 0..80 {
+            e.tick();
+        }
+        assert_eq!(e.skip_break_completion(), Some(80));
+    }
+
+    #[test]
+    fn skip_completion_is_zero_at_break_start() {
+        let mut e = Engine::new(10, 100);
+        e.start_break();
+        assert_eq!(e.skip_break_completion(), Some(0));
+    }
+
+    #[test]
+    fn restart_work_resets_to_a_fresh_work_interval() {
+        let mut e = Engine::new(5, 2);
+        e.start_break();
+        e.restart_work();
+        assert_eq!(e.state().phase, Phase::Work);
+        assert_eq!(e.state().remaining_secs, 5);
     }
 
     #[test]

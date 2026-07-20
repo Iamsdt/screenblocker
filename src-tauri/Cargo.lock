@@ -3104,6 +3104,7 @@ dependencies = [
  "chrono",
  "directories",
  "fastrand",
+ "notify-rust",
  "resvg",
  "serde",
  "serde_json",

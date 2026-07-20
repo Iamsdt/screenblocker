@@ -86,12 +86,19 @@ pub fn get_current_break(state: State<AppState>) -> Option<CurrentBreak> {
     state.current_break.lock().unwrap().clone()
 }
 
-/// Skip the in-progress break. Logs it as skipped and closes the overlay.
+/// Skip the in-progress break. A late skip (≥ the configured completion
+/// threshold) still counts as a successful break; an early one is skipped.
 #[tauri::command]
 pub fn skip_break(app: AppHandle, state: State<AppState>) {
-    let skipped = state.engine.lock().unwrap().skip_break();
-    if skipped {
-        let _ = state.store.append_event(crate::store::EventType::Skipped);
+    let completion = state.engine.lock().unwrap().skip_break_completion();
+    if let Some(percent) = completion {
+        let threshold = state.settings.lock().unwrap().skip_success_threshold;
+        let kind = if percent >= threshold {
+            crate::store::EventType::Successful
+        } else {
+            crate::store::EventType::Skipped
+        };
+        let _ = state.store.append_event(kind);
     }
     *state.current_break.lock().unwrap() = None;
     if let Some(w) = app.get_webview_window("overlay") {

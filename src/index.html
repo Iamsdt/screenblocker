@@ -13,6 +13,7 @@
       ScreenBlocker
     </span>
     <span class="status-dot" id="status"><span class="d"></span><span id="status-text">Starting…</span></span>
+    <button class="pause-btn" id="pause-btn">Pause</button>
     <div class="tabs">
       <button class="tab active" id="tab-dashboard">Dashboard</button>
       <button class="tab" id="tab-settings">Settings</button>
@@ -21,6 +22,15 @@
 
   <!-- DASHBOARD -->
   <div class="body" id="view-dashboard">
+    <div class="card timer-card" id="timer-card">
+      <div class="tc-info">
+        <div class="tc-phase" id="tc-phase">Focusing</div>
+        <div class="tc-sub" id="tc-sub">next break on the clock</div>
+      </div>
+      <div class="tc-time" id="tc-time">--:--</div>
+      <button class="tc-btn" id="tc-pause">Pause</button>
+    </div>
+
     <div class="tiles">
       <div class="tile accent">
         <div class="k"><span class="sw" style="background:var(--success)"></span>Successful today</div>
@@ -31,6 +41,11 @@
         <div class="k"><span class="sw" style="background:var(--skip)"></span>Skipped today</div>
         <div class="v" id="t-skip">0</div>
         <div class="sub">breaks cut short</div>
+      </div>
+      <div class="tile">
+        <div class="k"><span class="sw" style="background:var(--meeting)"></span>Missed in meetings</div>
+        <div class="v" id="t-missed">0</div>
+        <div class="sub">skipped during calls</div>
       </div>
       <div class="tile">
         <div class="k">🔥 Current streak</div>
@@ -75,6 +90,12 @@
           <button data-step="-1">−</button><div class="val"><span class="num">5</span><small> min</small></div><button data-step="1">+</button>
         </div>
       </div>
+      <div class="setrow">
+        <div class="info"><div class="t">Skip credit threshold</div><div class="d">Skipping a break past this point still counts as a successful break.</div></div>
+        <div class="stepper" data-key="skip_success_threshold" data-min="50" data-max="100">
+          <button data-step="-5">−</button><div class="val"><span class="num">70</span><small> %</small></div><button data-step="5">+</button>
+        </div>
+      </div>
     </div>
 
     <h2 class="sec">Meeting mode</h2>
@@ -82,7 +103,7 @@
       <div class="setrow">
         <div class="info">
           <div class="t">Auto-detect meetings</div>
-          <div class="d">Skip screen-blocking when your mic or camera is active. Shows a notification instead. <span class="meeting-live" id="meeting-live"><span class="d"></span><span id="meeting-live-text">checking…</span></span></div>
+          <div class="d">Skip screen-blocking when your mic or camera is active. Skipped breaks are counted as "missed in meetings" on the dashboard. <span class="meeting-live" id="meeting-live"><span class="d"></span><span id="meeting-live-text">checking…</span></span></div>
         </div>
         <button class="switch" data-key="auto_detect_meetings"></button>
       </div>

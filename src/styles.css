@@ -2,6 +2,7 @@
   color-scheme: light dark;
   --bg:#1a1a19; --card:#232320; --card2:#2b2b27; --text:#edece7; --muted:#9a9992;
   --border:#34342f; --success:#3aa981; --skip:#d9614e; --accent:#3aa981;
+  --meeting:#c9942a; --paused:#c9942a;
   --accent-soft:rgba(58,169,129,.14);
   --radius:16px; --radius-sm:10px;
   --font:-apple-system,"Inter","Segoe UI",Roboto,"Noto Sans",sans-serif;
@@ -10,6 +11,7 @@
 :root[data-theme="light"]{
   --bg:#f4f4f1; --card:#fff; --card2:#f7f7f4; --text:#1c1c1a; --muted:#6b6b64;
   --border:#e6e5df; --success:#2f9e6f; --skip:#cf5340; --accent:#2f9e6f;
+  --meeting:#b6831f; --paused:#b6831f;
   --accent-soft:rgba(47,158,111,.12);
 }
 *{box-sizing:border-box}
@@ -24,7 +26,9 @@ button{font-family:inherit;cursor:pointer}
 .logo svg{width:14px;height:14px}
 .status-dot{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
 .status-dot .d{width:8px;height:8px;border-radius:50%;background:var(--success);box-shadow:0 0 0 3px var(--accent-soft)}
-.status-dot.paused .d{background:var(--skip);box-shadow:0 0 0 3px rgba(217,97,78,.18)}
+.status-dot.paused .d{background:var(--paused);box-shadow:0 0 0 3px rgba(201,148,42,.18)}
+.pause-btn{background:var(--card);color:var(--text);border:1px solid var(--border);padding:6px 12px;border-radius:8px;font-size:12.5px;font-weight:500;transition:.15s}
+.pause-btn:hover{border-color:var(--accent);color:var(--accent)}
 .tabs{display:flex;gap:4px;margin-left:auto}
 .tab{background:transparent;border:none;color:var(--muted);font-size:13px;font-weight:500;padding:7px 13px;border-radius:8px}
 .tab.active{background:var(--card2);color:var(--text)}
@@ -33,8 +37,21 @@ button{font-family:inherit;cursor:pointer}
 h2.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 14px;font-weight:600}
 .hidden{display:none}
 
+/* live timer card */
+.timer-card{display:flex;align-items:center;gap:20px;margin-bottom:22px;padding:18px 22px;border-left:4px solid var(--accent);transition:border-color .2s}
+.timer-card.break{border-left-color:var(--success)}
+.timer-card.paused{border-left-color:var(--paused)}
+.tc-info{flex:1;min-width:0}
+.tc-phase{font-size:15px;font-weight:600}
+.tc-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.tc-time{font-family:var(--mono);font-size:40px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
+.timer-card.paused .tc-phase,.timer-card.paused .tc-time{color:var(--paused)}
+.tc-btn{background:var(--accent);color:#fff;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;transition:.15s;flex-shrink:0}
+.tc-btn:hover{opacity:.9}
+.timer-card.paused .tc-btn{background:var(--paused)}
+
 /* tiles */
-.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:26px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:26px}
 .tile{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px 18px}
 .tile .k{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:7px;margin-bottom:10px}
 .tile .k .sw{width:9px;height:9px;border-radius:3px}
@@ -82,4 +99,4 @@ h2.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 .meeting-live .d{width:8px;height:8px;border-radius:50%;background:var(--muted)}
 .meeting-live.active .d{background:var(--success)}
 
-@media(max-width:720px){.tiles{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:720px){.tiles{grid-template-columns:repeat(2,1fr)}.tc-time{font-size:32px}}

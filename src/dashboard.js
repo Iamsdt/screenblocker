@@ -27,6 +27,7 @@ async function loadDashboard() {
   const data = await invoke("get_dashboard_data");
   document.getElementById("t-success").textContent = data.today_successful;
   document.getElementById("t-skip").textContent = data.today_skipped;
+  document.getElementById("t-missed").textContent = data.today_meeting_missed;
   document.getElementById("t-streak").textContent = data.streak;
   document.getElementById("t-total").textContent = data.all_time_total;
   window._chartData = data.days;
@@ -144,32 +145,69 @@ async function pollMeeting() {
   } catch (_) {}
 }
 
-/* ---------- status line ---------- */
+/* ---------- status line + live timer ---------- */
 function fmtRemaining(secs) {
   if (secs >= 60) return `${Math.ceil(secs / 60)}m`;
   return `${secs}s`;
 }
+function fmtClock(secs) {
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 function renderStatus(state) {
   const el = document.getElementById("status");
   const txt = document.getElementById("status-text");
+  const btn = document.getElementById("pause-btn");
+  el.classList.toggle("paused", state.phase === "paused");
   if (state.phase === "paused") {
-    el.classList.add("paused");
     txt.textContent = "Paused";
   } else if (state.phase === "break") {
-    el.classList.remove("paused");
     txt.textContent = `On a break · ${fmtRemaining(state.remaining_secs)} left`;
   } else {
-    el.classList.remove("paused");
     txt.textContent = `Running · next break in ${fmtRemaining(state.remaining_secs)}`;
   }
+  if (btn) btn.textContent = state.phase === "paused" ? "Resume" : "Pause";
 }
 
-listen("engine-state", (e) => renderStatus(e.payload));
+function renderTimer(state) {
+  const card = document.getElementById("timer-card");
+  card.classList.toggle("paused", state.phase === "paused");
+  card.classList.toggle("break", state.phase === "break");
+  document.getElementById("tc-time").textContent = fmtClock(Math.max(0, state.remaining_secs));
+  const phase = document.getElementById("tc-phase");
+  const sub = document.getElementById("tc-sub");
+  if (state.phase === "paused") {
+    phase.textContent = "Paused";
+    sub.textContent = "timer is on hold";
+  } else if (state.phase === "break") {
+    phase.textContent = "On a break";
+    sub.textContent = "stand up and move";
+  } else {
+    phase.textContent = "Focusing";
+    sub.textContent = "next break on the clock";
+  }
+  document.getElementById("tc-pause").textContent = state.phase === "paused" ? "Resume" : "Pause";
+}
+
+function onState(state) {
+  renderStatus(state);
+  renderTimer(state);
+}
+
+async function togglePause() {
+  onState(await invoke("toggle_pause"));
+}
+document.getElementById("pause-btn").onclick = togglePause;
+document.getElementById("tc-pause").onclick = togglePause;
+
+listen("engine-state", (e) => onState(e.payload));
 
 /* ---------- init ---------- */
 loadDashboard();
 loadSettings();
-invoke("get_engine_state").then(renderStatus).catch(() => {});
+invoke("get_engine_state").then(onState).catch(() => {});
 pollMeeting();
 setInterval(pollMeeting, 5000);
 setInterval(loadDashboard, 30000);

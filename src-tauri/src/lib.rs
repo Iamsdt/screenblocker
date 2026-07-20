@@ -14,7 +14,6 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent,
 };
-use tauri_plugin_notification::NotificationExt;
 
 pub fn run() {
     tauri::Builder::default()
@@ -128,8 +127,21 @@ fn show_dashboard(app: &AppHandle) {
     }
 }
 
-fn notify(app: &AppHandle, title: &str, body: &str) {
-    let _ = app.notification().builder().title(title).body(body).show();
+/// How long a notification stays on screen before the server dismisses it.
+/// KDE Plasma honours the requested expire timeout.
+const NOTIFY_TIMEOUT_MS: u32 = 15_000;
+
+fn notify(title: &str, body: &str) {
+    let title = title.to_string();
+    let body = body.to_string();
+    // notify_rust::show() makes a blocking D-Bus call; keep it off the tick loop.
+    std::thread::spawn(move || {
+        let _ = notify_rust::Notification::new()
+            .summary(&title)
+            .body(&body)
+            .timeout(notify_rust::Timeout::Milliseconds(NOTIFY_TIMEOUT_MS))
+            .show();
+    });
 }
 
 fn open_overlay(app: &AppHandle) {
@@ -167,14 +179,19 @@ fn tick_loop(app: AppHandle) {
             timer::Tick::None => {}
         }
 
-        let remaining = {
+        // Emit the current state and paint the tray.
+        let s = {
             let state = app.state::<AppState>();
             let s = state.engine.lock().unwrap().state();
             let _ = app.emit("engine-state", s);
-            s.remaining_secs
+            s
         };
         if let Some(tray) = app.tray_by_id("main") {
-            let _ = tray.set_icon(Some(tray_icon::time_icon(remaining)));
+            let icon = match s.phase {
+                timer::Phase::Paused => tray_icon::pause_icon(),
+                _ => tray_icon::time_icon(s.remaining_secs),
+            };
+            let _ = tray.set_icon(Some(icon));
         }
     }
 }
@@ -186,23 +203,30 @@ fn on_work_ended(app: &AppHandle) {
         meeting::meeting_state(settings.manual_meeting_override, settings.auto_detect_meetings);
 
     if is_meeting {
-        let body = messages::random_meeting();
-        notify(app, "You're on a call — stand up anyway 🧍", body);
+        // Don't interrupt a call: skip the break, keep working, and record it as
+        // missed-during-meeting so the dashboard can surface it once the call ends.
         let _ = state.store.append_event(EventType::MeetingNotified);
         state.engine.lock().unwrap().restart_work();
     } else {
-        let (title, body) = messages::random_stretch();
-        let successful_today = state.store.dashboard_data(1).today_successful;
-        let break_secs = state.engine.lock().unwrap().state().break_secs;
-        *state.current_break.lock().unwrap() = Some(CurrentBreak {
-            title: title.to_string(),
-            body: body.to_string(),
-            break_secs,
-            successful_today,
-        });
-        state.engine.lock().unwrap().start_break();
-        open_overlay(app);
+        begin_break(app);
     }
+}
+
+/// Start the break countdown: publish the break info, flip the engine, and open
+/// the overlay.
+fn begin_break(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let (title, body) = messages::random_stretch();
+    let successful_today = state.store.dashboard_data(1).today_successful;
+    let break_secs = state.engine.lock().unwrap().state().break_secs;
+    *state.current_break.lock().unwrap() = Some(CurrentBreak {
+        title: title.to_string(),
+        body: body.to_string(),
+        break_secs,
+        successful_today,
+    });
+    state.engine.lock().unwrap().start_break();
+    open_overlay(app);
 }
 
 fn on_break_ended(app: &AppHandle) {
@@ -211,7 +235,6 @@ fn on_break_ended(app: &AppHandle) {
     *state.current_break.lock().unwrap() = None;
     close_overlay(app);
     notify(
-        app,
         "Nice — break complete ✓",
         "Back to focus. Your next break is on the clock.",
     );

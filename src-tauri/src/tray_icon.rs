@@ -9,6 +9,8 @@ const SIZE: u32 = 64;
 // Accent green (normal) / coral (final minute — break imminent).
 const ACCENT: (u8, u8, u8) = (47, 158, 111);
 const WARN: (u8, u8, u8) = (207, 83, 64);
+// Muted grey (paused).
+const MUTED: (u8, u8, u8) = (108, 114, 122);
 
 /// Segment membership per digit: [a, b, c, d, e, f, g].
 fn segments(d: u8) -> [bool; 7] {
@@ -102,6 +104,35 @@ pub fn render_rgba(text: &str, warn: bool) -> Vec<u8> {
     unpremultiply(pixmap.data())
 }
 
+/// Render a symbolic glyph (white shapes on a coloured pill) to straight-alpha
+/// RGBA bytes. Used for the paused and meeting-waiting tray states.
+fn render_glyph(pill: (u8, u8, u8), rects: &[(f32, f32, f32, f32)]) -> Vec<u8> {
+    let mut pixmap = Pixmap::new(SIZE, SIZE).unwrap();
+
+    let mut bg = PathBuilder::new();
+    rounded_rect(&mut bg, 2.0, 16.0, 60.0, 32.0, 11.0);
+    if let Some(path) = bg.finish() {
+        let mut paint = Paint::default();
+        paint.set_color_rgba8(pill.0, pill.1, pill.2, 255);
+        paint.anti_alias = true;
+        pixmap.fill_path(&path, &paint, FillRule::Winding, Transform::identity(), None);
+    }
+
+    let mut gp = PathBuilder::new();
+    for &(x, y, w, h) in rects {
+        // Slightly rounded corners so the marks match the pill's softness.
+        rounded_rect(&mut gp, x, y, w, h, (w.min(h) / 3.0).min(3.0));
+    }
+    if let Some(path) = gp.finish() {
+        let mut paint = Paint::default();
+        paint.set_color_rgba8(255, 255, 255, 255);
+        paint.anti_alias = true;
+        pixmap.fill_path(&path, &paint, FillRule::Winding, Transform::identity(), None);
+    }
+
+    unpremultiply(pixmap.data())
+}
+
 /// tiny-skia stores premultiplied alpha; convert to straight alpha for Tauri.
 fn unpremultiply(data: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(data.len());
@@ -130,6 +161,13 @@ pub fn time_icon(remaining_secs: i64) -> tauri::image::Image<'static> {
     tauri::image::Image::new_owned(rgba, SIZE, SIZE)
 }
 
+/// Paused: two vertical bars on a muted grey pill.
+pub fn pause_icon() -> tauri::image::Image<'static> {
+    let bars = [(21.0, 23.0, 7.0, 18.0), (36.0, 23.0, 7.0, 18.0)];
+    let rgba = render_glyph(MUTED, &bars);
+    tauri::image::Image::new_owned(rgba, SIZE, SIZE)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -144,5 +182,11 @@ mod tests {
     fn single_and_double_digit_both_render() {
         assert_eq!(render_rgba("5", false).len() as u32, SIZE * SIZE * 4);
         assert_eq!(render_rgba("45", true).len() as u32, SIZE * SIZE * 4);
+    }
+
+    #[test]
+    fn glyphs_render_expected_buffer_size() {
+        let bars = [(21.0, 23.0, 7.0, 18.0), (36.0, 23.0, 7.0, 18.0)];
+        assert_eq!(render_glyph(MUTED, &bars).len() as u32, SIZE * SIZE * 4);
     }
 }

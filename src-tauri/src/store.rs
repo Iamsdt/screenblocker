@@ -31,6 +31,12 @@ struct History {
     events: Vec<Event>,
 }
 
+/// Default late-skip credit threshold (percent). Skipping a break with at least
+/// this fraction elapsed counts as a successful break.
+fn default_skip_success_threshold() -> u32 {
+    70
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
     pub work_minutes: u32,
@@ -39,6 +45,10 @@ pub struct Settings {
     /// `None` = follow auto-detect; `Some(true/false)` = forced on/off.
     pub manual_meeting_override: Option<bool>,
     pub start_on_login: bool,
+    /// Percent of a break that must be elapsed for a late skip to count as
+    /// successful. `serde(default)` keeps pre-existing settings.json readable.
+    #[serde(default = "default_skip_success_threshold")]
+    pub skip_success_threshold: u32,
 }
 
 impl Default for Settings {
@@ -49,6 +59,7 @@ impl Default for Settings {
             auto_detect_meetings: true,
             manual_meeting_override: None,
             start_on_login: true,
+            skip_success_threshold: default_skip_success_threshold(),
         }
     }
 }
@@ -58,12 +69,15 @@ pub struct DayCount {
     pub date: String, // YYYY-MM-DD
     pub successful: u32,
     pub skipped: u32,
+    /// Breaks skipped because a meeting was in progress.
+    pub meeting_missed: u32,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct DashboardData {
     pub today_successful: u32,
     pub today_skipped: u32,
+    pub today_meeting_missed: u32,
     pub streak: u32,
     pub all_time_total: u32,
     pub days: Vec<DayCount>,
@@ -137,9 +151,9 @@ impl Store {
     pub fn dashboard_data_asof(&self, days: usize, today: NaiveDate) -> DashboardData {
         let history = self.load_history();
 
-        // date -> (successful, skipped)
+        // date -> (successful, skipped, meeting_missed)
         use std::collections::HashMap;
-        let mut per_day: HashMap<NaiveDate, (u32, u32)> = HashMap::new();
+        let mut per_day: HashMap<NaiveDate, (u32, u32, u32)> = HashMap::new();
         let mut all_time_total = 0u32;
 
         for ev in &history.events {
@@ -147,25 +161,26 @@ impl Store {
                 Ok(dt) => dt.with_timezone(&Local).date_naive(),
                 Err(_) => continue,
             };
-            let entry = per_day.entry(date).or_insert((0, 0));
+            let entry = per_day.entry(date).or_insert((0, 0, 0));
             match ev.kind {
                 EventType::Successful => {
                     entry.0 += 1;
                     all_time_total += 1;
                 }
                 EventType::Skipped => entry.1 += 1,
-                EventType::MeetingNotified => {}
+                // A break skipped because a meeting was in progress.
+                EventType::MeetingNotified => entry.2 += 1,
             }
         }
 
-        let (today_successful, today_skipped) =
-            per_day.get(&today).copied().unwrap_or((0, 0));
+        let (today_successful, today_skipped, today_meeting_missed) =
+            per_day.get(&today).copied().unwrap_or((0, 0, 0));
 
         // Streak: consecutive days ending today meeting the threshold.
         let mut streak = 0u32;
         let mut cursor = today;
         loop {
-            let s = per_day.get(&cursor).map(|(s, _)| *s).unwrap_or(0);
+            let s = per_day.get(&cursor).map(|(s, _, _)| *s).unwrap_or(0);
             if s >= STREAK_MIN_SUCCESS {
                 streak += 1;
                 cursor -= Duration::days(1);
@@ -178,17 +193,19 @@ impl Store {
         let mut day_counts = Vec::with_capacity(days);
         for i in (0..days).rev() {
             let d = today - Duration::days(i as i64);
-            let (s, k) = per_day.get(&d).copied().unwrap_or((0, 0));
+            let (s, k, m) = per_day.get(&d).copied().unwrap_or((0, 0, 0));
             day_counts.push(DayCount {
                 date: d.format("%Y-%m-%d").to_string(),
                 successful: s,
                 skipped: k,
+                meeting_missed: m,
             });
         }
 
         DashboardData {
             today_successful,
             today_skipped,
+            today_meeting_missed,
             streak,
             all_time_total,
             days: day_counts,
@@ -245,13 +262,29 @@ mod tests {
     }
 
     #[test]
+    fn missing_threshold_field_defaults_to_70() {
+        // A settings.json written before this feature has no threshold field.
+        let legacy = r#"{
+            "work_minutes": 30,
+            "break_minutes": 5,
+            "auto_detect_meetings": true,
+            "manual_meeting_override": null,
+            "start_on_login": true
+        }"#;
+        let s: Settings = serde_json::from_str(legacy).unwrap();
+        assert_eq!(s.skip_success_threshold, 70);
+        assert_eq!(s.work_minutes, 30);
+    }
+
+    #[test]
     fn aggregates_by_day_with_streak_and_totals() {
         let store = temp_store("agg");
         let today = at(2026, 7, 19);
-        // today: 2 successful, 1 skipped
+        // today: 2 successful, 1 skipped, 1 missed during a meeting
         store.append_event_at(EventType::Successful, today).unwrap();
         store.append_event_at(EventType::Successful, today).unwrap();
         store.append_event_at(EventType::Skipped, today).unwrap();
+        store.append_event_at(EventType::MeetingNotified, today).unwrap();
         // yesterday: 1 successful
         store.append_event_at(EventType::Successful, at(2026, 7, 18)).unwrap();
         // 2 days ago: only a meeting notice (breaks the streak, not a break)
@@ -262,6 +295,7 @@ mod tests {
         let data = store.dashboard_data_asof(14, today.date_naive());
         assert_eq!(data.today_successful, 2);
         assert_eq!(data.today_skipped, 1);
+        assert_eq!(data.today_meeting_missed, 1);
         assert_eq!(data.streak, 2, "today + yesterday, broken by the meeting-only day");
         assert_eq!(data.all_time_total, 4, "successful breaks all-time");
         assert_eq!(data.days.len(), 14);
@@ -269,5 +303,6 @@ mod tests {
         assert_eq!(last.date, "2026-07-19");
         assert_eq!(last.successful, 2);
         assert_eq!(last.skipped, 1);
+        assert_eq!(last.meeting_missed, 1);
     }
 }
